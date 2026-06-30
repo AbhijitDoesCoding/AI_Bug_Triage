@@ -1,0 +1,91 @@
+# workflows/release-notes/release_notes.toml
+# Lemma workflow configuration (TOML reference).
+# The authoritative format is release-notes.json — this file is a human-readable reference.
+
+name = "release-notes"
+description = "Drafts release notes when a bug is marked as Fixed, with human-in-the-loop approval."
+visibility = "POD"
+
+# ── Trigger ──────────────────────────────────────────────────────────────────
+# Fires on every UPDATE to the bugs table. The DECISION node below filters
+# to only status == 'Fixed'.
+
+[start]
+type = "DATASTORE_EVENT"
+
+[start.config]
+table_name = "bugs"
+operations = ["UPDATE"]
+
+# ── Nodes ────────────────────────────────────────────────────────────────────
+
+# 1. Guard: only proceed when status changes to Fixed
+[[nodes]]
+id = "check_fixed"
+type = "DECISION"
+label = "Check Status == Fixed"
+
+[[nodes.config.rules]]
+condition = "start.payload.status == 'Fixed'"
+next_node_id = "draft_note"
+
+# 2. Agent drafts the release note
+[[nodes]]
+id = "draft_note"
+type = "AGENT"
+label = "Draft Release Note"
+
+[nodes.config]
+agent_name = "triage_agent"
+
+[nodes.config.input_mapping.bug_id]
+type = "expression"
+value = "start.payload.id"
+
+# 3. Human approval — pauses the workflow, routes to the approval queue
+[[nodes]]
+id = "approval"
+type = "FORM"
+label = "Review & Approve Release Note"
+
+[nodes.config.input_schema]
+type = "object"
+required = ["approved"]
+
+[nodes.config.input_schema.properties.approved]
+type = "boolean"
+title = "Approve this release note?"
+
+[nodes.config.input_schema.properties.edited_note]
+type = "string"
+title = "Edited release note (leave blank to use draft)"
+
+# Uncomment and set to a pod member UUID to route to a specific reviewer:
+# [nodes.config]
+# assignee_pod_member_id = "00000000-0000-0000-0000-000000000000"
+
+# 4. Terminal
+[[nodes]]
+id = "end"
+type = "END"
+label = "Done"
+
+# ── Edges ────────────────────────────────────────────────────────────────────
+
+# Default path: status != Fixed → skip to end
+[[edges]]
+id = "e1"
+source = "check_fixed"
+target = "end"
+
+# Draft → approval form
+[[edges]]
+id = "e2"
+source = "draft_note"
+target = "approval"
+
+# Approval submitted → end
+[[edges]]
+id = "e3"
+source = "approval"
+target = "end"
