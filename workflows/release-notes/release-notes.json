@@ -1,0 +1,63 @@
+{
+  "name": "release-notes",
+  "description": "Drafts release notes when a bug is marked as Fixed, with human-in-the-loop approval.",
+  "start": {
+    "type": "DATASTORE_EVENT",
+    "config": {
+      "table_name": "bugs",
+      "operations": ["UPDATE"]
+    }
+  },
+  "nodes": [
+    {
+      "id": "check_fixed",
+      "type": "DECISION",
+      "label": "Check Status == Fixed",
+      "config": {
+        "rules": [
+          {
+            "condition": "start.payload.status == 'Fixed'",
+            "next_node_id": "draft_note"
+          }
+        ]
+      }
+    },
+    {
+      "id": "draft_note",
+      "type": "AGENT",
+      "label": "Draft Release Note",
+      "config": {
+        "agent_name": "triage_agent",
+        "input_mapping": {
+          "bug_id": { "type": "expression", "value": "start.payload.id" }
+        }
+      }
+    },
+    {
+      "id": "approval",
+      "type": "FORM",
+      "label": "Review & Approve Release Note",
+      "config": {
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "approved": { "type": "boolean", "title": "Approve this release note?" },
+            "edited_note": { "type": "string", "title": "Edited release note (leave blank to use draft)" }
+          },
+          "required": ["approved"]
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "END",
+      "label": "Done"
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "check_fixed", "target": "end" },
+    { "id": "e2", "source": "draft_note", "target": "approval" },
+    { "id": "e3", "source": "approval", "target": "end" }
+  ],
+  "visibility": "POD"
+}

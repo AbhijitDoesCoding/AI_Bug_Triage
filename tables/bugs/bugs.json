@@ -1,0 +1,16 @@
+{
+  "name": "bugs",
+  "primary_key_column": "id",
+  "enable_rls": false,
+  "visibility": "POD",
+  "columns": [
+    { "name": "title", "type": "TEXT", "required": true, "max_length": 240 },
+    { "name": "priority", "type": "ENUM", "required": true, "default": "Medium",
+      "options": ["Low", "Medium", "High"] },
+    { "name": "raw_complaint", "type": "TEXT", "required": true },
+    { "name": "repro_steps", "type": "TEXT", "required": false },
+    { "name": "status", "type": "ENUM", "required": true, "default": "Open",
+      "options": ["Open", "In_Progress", "Fixed"] }
+  ],
+  "config": {}
+}

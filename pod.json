@@ -1,5 +1,5 @@
 {
   "format_version": 2,
   "name": "bug-triage",
-  "description": "TODO: one line on what this pod does"
+  "description": "AI Bug Triage & Release Operator — structures bug reports from support channels and automates release note drafting."
 }
