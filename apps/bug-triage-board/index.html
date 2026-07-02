@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bug Triage Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --paper: #14130f;
+        --card: #1d1b14;
+        --card2: #242118;
+        --ink: #f1ead9;
+        --muted: #a99f8b;
+        --line: #2e2a20;
+        --gold: #e0bd4a;
+        --serif: "Fraunces", ui-serif, Georgia, serif;
+        --sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+        --glow: #2a2413;
+        /* status */
+        --open: #d9a441;
+        --prog: #4d8ac0;
+        --fixed: #6fa06f;
+        /* priority */
+        --high: #d05a4e;
+        --med: #d9a441;
+        --low: #6fa06f;
+      }
+      [data-theme="light"] {
+        color-scheme: light;
+        --paper: #faf8f3; --card: #fffdf8; --card2: #f6f2e9; --ink: #1c1a17; --muted: #6f6658;
+        --line: #ece6da; --gold: #b8901f; --glow: #fdf6e6;
+        --open: #c1892b; --prog: #3b6ea5; --fixed: #5c7a53; --high: #b3392e; --med: #c1892b; --low: #5c7a53;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; background:
+          radial-gradient(120% 90% at 100% 0%, var(--glow) 0%, rgba(0,0,0,0) 55%), var(--paper);
+        color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+        transition: background-color .25s ease, color .25s ease;
+      }
+      .wrap { max-width: 1120px; margin: 0 auto; padding: clamp(1.2rem, 4vw, 2.6rem); }
+      .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      .eyebrow { font-size: .74rem; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+      h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(1.8rem, 4.5vw, 2.7rem);
+        letter-spacing: -.015em; margin: .25rem 0 0; line-height: 1.05; }
+      .sub { color: var(--muted); margin: .5rem 0 0; max-width: 52ch; }
+      .pill { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; color: var(--muted);
+        background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: .4rem .8rem; }
+      .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--fixed);
+        box-shadow: 0 0 0 0 rgba(111,160,111,.5); animation: pulse 2.4s infinite; }
+      @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(111,160,111,.45); } 70% { box-shadow: 0 0 0 7px rgba(111,160,111,0); } 100% { box-shadow: 0 0 0 0 rgba(111,160,111,0); } }
+      .pill button { font: inherit; cursor: pointer; border: none; background: none; color: var(--ink); text-decoration: underline; padding: 0; }
+      .pill #theme { text-decoration: none; font-size: .95rem; line-height: 1; }
+
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-top: 1.8rem; }
+      .stat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.1rem; position: relative; overflow: hidden; }
+      .stat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent, var(--gold)); opacity: .9; }
+      .stat .n { font-family: var(--serif); font-size: 2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+      .stat .l { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: .45rem; }
+
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; align-items: stretch; }
+      .grid3 { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 1rem; margin-top: 1rem; align-items: stretch; }
+      @media (max-width: 860px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+      .panel { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 1.3rem 1.4rem;
+        box-shadow: 0 16px 40px rgba(0,0,0,.14); }
+      .panel h2 { font-family: var(--serif); font-weight: 500; font-size: 1.12rem; margin: 0 0 .15rem; letter-spacing: -.01em; }
+      .panel .cap { color: var(--muted); font-size: .82rem; margin: 0 0 1rem; }
+
+      .donut-wrap { display: flex; gap: 1.1rem; align-items: center; flex-wrap: wrap; }
+      .legend { display: grid; gap: .5rem; min-width: 120px; flex: 1; }
+      .legend .row { display: flex; align-items: center; gap: .55rem; font-size: .86rem; }
+      .legend .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+      .legend .row b { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+      .funnel { display: grid; gap: .75rem; margin-top: .2rem; }
+      .fstep .fhead { display: flex; justify-content: space-between; font-size: .84rem; margin-bottom: .3rem; }
+      .fstep .fhead b { font-variant-numeric: tabular-nums; }
+      .track { height: 12px; background: var(--card2); border-radius: 999px; overflow: hidden; }
+      .track > span { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
+
+      .bars { display: grid; gap: .6rem; margin-top: .2rem; }
+      .bar { display: grid; grid-template-columns: 92px 1fr 28px; align-items: center; gap: .6rem; font-size: .84rem; }
+      .bar .bt { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bar .bv { text-align: right; font-variant-numeric: tabular-nums; }
+      .bar .bk { height: 10px; background: var(--card2); border-radius: 999px; overflow: hidden; }
+      .bar .bk > span { display: block; height: 100%; border-radius: 999px; }
+
+      table { width: 100%; border-collapse: collapse; margin-top: .2rem; }
+      th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+        font-weight: 600; padding: 0 .6rem .55rem; border-bottom: 1px solid var(--line); }
+      td { padding: .6rem; border-bottom: 1px solid var(--line); font-size: .88rem; vertical-align: middle; }
+      tr:last-child td { border-bottom: none; }
+      .title-cell { font-weight: 600; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .badge { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; font-weight: 600;
+        padding: .18rem .5rem; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+      .badge .d { width: 7px; height: 7px; border-radius: 50%; }
+      .comp { font-size: .76rem; color: var(--muted); }
+      .rn-yes { color: var(--fixed); font-weight: 600; }
+      .rn-wait { color: var(--open); font-weight: 600; }
+      .rn-na { color: var(--muted); }
+
+      footer { margin-top: 1.6rem; color: var(--muted); font-size: .8rem; }
+      footer code { font-family: var(--mono); background: var(--card2); padding: .1rem .4rem; border-radius: 6px; }
+      .center { min-height: 86dvh; display: grid; place-items: center; text-align: center; }
+      .center .box { max-width: 26rem; }
+      .center button { margin-top: 1.3rem; padding: .75rem 1.6rem; font: inherit; font-weight: 600; cursor: pointer;
+        border: none; border-radius: 999px; background: var(--gold); color: #14130f; }
+      .empty { text-align: center; color: var(--muted); padding: 1.5rem 0; }
+      svg { display: block; max-width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="app"><div class="center"><div class="box"><p>Loading…</p></div></div></div>
+
+    <script>
+      (function () {
+        var cfg = window.__LEMMA_CONFIG__ || {};
+        var base = (cfg.apiUrl || window.location.origin).replace(/\/$/, "");
+        var s = document.createElement("script");
+        s.src = base + "/public/sdk/lemma-client.js";
+        s.onload = boot;
+        s.onerror = function () { fatal("Couldn't load the Lemma SDK from " + s.src); };
+        document.head.appendChild(s);
+      })();
+
+      var TABLE = "bugs";
+      var PRIORITY_ORDER = ["High", "Medium", "Low"];
+      var STATUS_ORDER = ["Open", "In_Progress", "Fixed"];
+      var COMPONENT_PALETTE = ["#4d8ac0", "#d9a441", "#6fa06f", "#b07fb0", "#c98a5a", "#5cae9e", "#d05a4e"];
+      var PRIORITY_COLOR = { High: "var(--high)", Medium: "var(--med)", Low: "var(--low)" };
+      var STATUS_COLOR = { Open: "var(--open)", In_Progress: "var(--prog)", Fixed: "var(--fixed)" };
+      var client, _watch;
+
+      function $(id) { return document.getElementById(id); }
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+      function field(r, k) { return (r && r.data && r.data[k] != null) ? r.data[k] : (r ? r[k] : undefined); }
+      function listOf(resp) { return (resp && (resp.items || resp.data)) || (Array.isArray(resp) ? resp : []); }
+      function fatal(msg) { $("app").innerHTML = '<div class="center"><div class="box"><h1>⚠</h1><p>' + esc(msg) + "</p></div></div>"; }
+      function statusLabel(s) { return String(s || "").replace(/_/g, " "); }
+
+      function currentTheme() { try { return localStorage.getItem("bt-theme") || "dark"; } catch (e) { return "dark"; } }
+      function applyTheme(t) {
+        document.documentElement.setAttribute("data-theme", t);
+        try { localStorage.setItem("bt-theme", t); } catch (e) {}
+        var b = $("theme"); if (b) b.textContent = t === "dark" ? "☀" : "☾";
+      }
+
+      async function boot() {
+        applyTheme(currentTheme());
+        try {
+          client = new window.LemmaClient.LemmaClient();
+          var auth = await client.initialize();
+          if (auth.status !== "authenticated") return signIn();
+          await refresh(auth.user);
+          watchLive(auth.user);
+        } catch (e) { fatal((e && e.message) || "Something went wrong."); }
+      }
+
+      function signIn() {
+        $("app").innerHTML =
+          '<div class="center"><div class="box"><div class="eyebrow">Bug Triage</div>' +
+          '<h1>Sign in</h1><p class="sub" style="margin:.6rem auto 0">Authenticate to open the dashboard.</p>' +
+          '<button id="si">Sign in</button></div></div>';
+        $("si").onclick = function () { client.auth.redirectToAuth(); };
+      }
+
+      async function refresh(user) {
+        var rows = [];
+        try { rows = listOf(await client.records.list(TABLE, { limit: 500 })); } catch (e) {}
+        render(user, rows);
+      }
+
+      // Re-render on any change to the bugs table — event-driven, not polling.
+      function watchLive(user) {
+        if (!client.datastore || !client.datastore.watchChanges) return;
+        try {
+          _watch = client.datastore.watchChanges({
+            table: TABLE,
+            onChange: function () { refresh(user); },
+          });
+        } catch (e) {}
+      }
+
+      function countBy(rows, key, order) {
+        var c = {};
+        (order || []).forEach(function (k) { c[k] = 0; });
+        rows.forEach(function (r) {
+          var v = field(r, key); if (v == null || v === "") return;
+          c[v] = (c[v] || 0) + 1;
+        });
+        return c;
+      }
+
+      function render(user, rows) {
+        var total = rows.length;
+        var byStatus = countBy(rows, "status", STATUS_ORDER);
+        var byPriority = countBy(rows, "priority", PRIORITY_ORDER);
+        var byComponent = countBy(rows, "component", []);
+        var openHigh = rows.filter(function (r) {
+          return field(r, "priority") === "High" && field(r, "status") !== "Fixed";
+        }).length;
+        var fixed = byStatus.Fixed || 0;
+        var approved = rows.filter(function (r) { return field(r, "release_notes_approved") === true; }).length;
+        var pendingNotes = rows.filter(function (r) {
+          return field(r, "status") === "Fixed" && field(r, "release_notes_approved") !== true;
+        }).length;
+
+        var who = (user && (user.name || user.email)) || "";
+        var hour = new Date().getHours();
+        var greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+        var html =
+          '<div class="wrap"><div class="top"><div>' +
+          '<div class="eyebrow">Bug Triage · Live</div>' +
+          "<h1>" + esc(greet) + "</h1>" +
+          '<p class="sub">Every bug your agent triages from support channels, structured and tracked here — ' +
+          "updating live as reports come in and get fixed.</p></div>" +
+          '<div class="pill"><span class="pip"></span> live' + (who ? " · " + esc(who) : "") +
+          ' · <button id="theme" title="Toggle light / dark">☀</button></div></div>';
+
+        // KPI tiles
+        html += '<div class="stats">' +
+          statTile(total, "total bugs", "var(--gold)") +
+          statTile(byStatus.Open || 0, "open", "var(--open)") +
+          statTile(byStatus.In_Progress || 0, "in progress", "var(--prog)") +
+          statTile(fixed, "fixed", "var(--fixed)") +
+          statTile(openHigh, "high priority open", "var(--high)") +
+          "</div>";
+
+        if (!total) {
+          html += '<div class="panel" style="margin-top:1rem"><div class="empty">' +
+            "<h2>No bugs yet</h2><p class=\"cap\" style=\"margin:.4rem 0 0\">DM the triage agent or chat with it in Lemma — " +
+            "triaged reports appear here instantly.</p></div></div>";
+        } else {
+          // Row 1: status funnel + priority donut
+          html += '<div class="grid2">' +
+            '<div class="panel"><h2>Status funnel</h2><p class="cap">Where every bug sits in the lifecycle</p>' +
+              funnel(byStatus, total) + "</div>" +
+            '<div class="panel"><h2>By priority</h2><p class="cap">Severity mix across all bugs</p>' +
+              '<div class="donut-wrap">' + donut(byPriority, PRIORITY_COLOR, PRIORITY_ORDER) + "</div></div>" +
+            "</div>";
+
+          // Row 2: components + release-note pipeline
+          html += '<div class="grid2">' +
+            '<div class="panel"><h2>By component</h2><p class="cap">Which part of the product is affected</p>' +
+              componentBars(byComponent) + "</div>" +
+            '<div class="panel"><h2>Release notes</h2><p class="cap">Draft → approve pipeline for fixed bugs</p>' +
+              rnPipeline(fixed, approved, pendingNotes) + "</div>" +
+            "</div>";
+
+          // Recent bugs table
+          html += '<div class="panel" style="margin-top:1rem"><h2>Recent bugs</h2>' +
+            '<p class="cap">Newest first — priority, component, and release-note status</p>' +
+            recentTable(rows) + "</div>";
+        }
+
+        html += "<footer>Live via the Lemma SDK · table <code>bugs</code> · " +
+          "reloads automatically as rows change (no polling). Redeploy with " +
+          "<code>lemma apps deploy dashboard ./index.html</code>.</footer></div>";
+
+        $("app").innerHTML = html;
+        applyTheme(currentTheme());
+        $("theme").onclick = function () { applyTheme(currentTheme() === "dark" ? "light" : "dark"); };
+      }
+
+      function statTile(n, l, accent) {
+        return '<div class="stat" style="--accent:' + accent + '"><div class="n">' + esc(n) +
+          '</div><div class="l">' + esc(l) + "</div></div>";
+      }
+
+      function funnel(byStatus, total) {
+        var max = total || 1;
+        return '<div class="funnel">' + STATUS_ORDER.map(function (s) {
+          var n = byStatus[s] || 0, pct = Math.round((n / max) * 100);
+          return '<div class="fstep"><div class="fhead"><span>' + esc(statusLabel(s)) + "</span><b>" + n +
+            " · " + pct + '%</b></div><div class="track"><span style="width:' + pct + "%;background:" +
+            STATUS_COLOR[s] + '"></span></div></div>';
+        }).join("") + "</div>";
+      }
+
+      function donut(counts, colorMap, order) {
+        var entries = order.filter(function (k) { return counts[k]; }).map(function (k) { return { k: k, n: counts[k] }; });
+        var total = entries.reduce(function (a, b) { return a + b.n; }, 0) || 1;
+        var R = 84, C = 110, sw = 24, circ = 2 * Math.PI * R, gap = entries.length > 1 ? 0.014 * circ : 0;
+        var off = 0, arcs = "";
+        entries.forEach(function (e) {
+          var frac = e.n / total, len = Math.max(circ * frac - gap, 0.001);
+          arcs += '<circle cx="' + C + '" cy="' + C + '" r="' + R + '" fill="none" stroke="' + colorMap[e.k] +
+            '" stroke-width="' + sw + '" stroke-linecap="round" stroke-dasharray="' + len + " " + (circ - len) +
+            '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 ' + C + " " + C + ')">' +
+            "<title>" + esc(e.k) + ": " + e.n + "</title></circle>";
+          off += circ * frac;
+        });
+        var svg = '<svg viewBox="0 0 220 220" width="180" height="180" role="img">' + arcs +
+          '<text x="' + C + '" y="' + (C - 4) + '" text-anchor="middle" font-family="var(--serif)" font-size="34" fill="currentColor">' + total + "</text>" +
+          '<text x="' + C + '" y="' + (C + 18) + '" text-anchor="middle" font-size="11" letter-spacing="1.5" fill="currentColor" opacity="0.55">BUGS</text></svg>';
+        var legend = '<div class="legend">' + entries.map(function (e) {
+          return '<div class="row"><span class="dot" style="background:' + colorMap[e.k] + '"></span>' +
+            esc(e.k) + "<b>" + e.n + "</b></div>";
+        }).join("") + "</div>";
+        return svg + legend;
+      }
+
+      function componentBars(counts) {
+        var entries = Object.keys(counts).map(function (k) { return { k: k, n: counts[k] }; })
+          .sort(function (a, b) { return b.n - a.n; });
+        if (!entries.length) return '<div class="empty">No components yet</div>';
+        var max = entries.reduce(function (a, b) { return Math.max(a, b.n); }, 1);
+        return '<div class="bars">' + entries.map(function (e, i) {
+          var pct = Math.round((e.n / max) * 100), col = COMPONENT_PALETTE[i % COMPONENT_PALETTE.length];
+          return '<div class="bar"><span class="bt">' + esc(e.k) + '</span>' +
+            '<span class="bk"><span style="width:' + pct + "%;background:" + col + '"></span></span>' +
+            '<span class="bv">' + e.n + "</span></div>";
+        }).join("") + "</div>";
+      }
+
+      function rnPipeline(fixed, approved, pending) {
+        var steps = [
+          { l: "Bugs fixed", n: fixed, c: "var(--fixed)" },
+          { l: "Notes approved", n: approved, c: "var(--gold)" },
+          { l: "Awaiting approval", n: pending, c: "var(--open)" },
+        ];
+        var max = Math.max(fixed, 1);
+        return '<div class="funnel">' + steps.map(function (s) {
+          var pct = Math.round((s.n / max) * 100);
+          return '<div class="fstep"><div class="fhead"><span>' + esc(s.l) + "</span><b>" + s.n +
+            '</b></div><div class="track"><span style="width:' + Math.max(pct, s.n ? 6 : 0) +
+            "%;background:" + s.c + '"></span></div></div>';
+        }).join("") + "</div>";
+      }
+
+      function recentTable(rows) {
+        var sorted = rows.slice().sort(function (a, b) {
+          return String(field(b, "created_at") || "").localeCompare(String(field(a, "created_at") || ""));
+        }).slice(0, 8);
+        var body = sorted.map(function (r) {
+          var title = field(r, "title") || "Untitled";
+          var pr = field(r, "priority") || "—";
+          var st = field(r, "status") || "—";
+          var comp = field(r, "component") || "—";
+          var approved = field(r, "release_notes_approved") === true;
+          var isFixed = st === "Fixed";
+          var rn = approved ? '<span class="rn-yes">✓ approved</span>'
+            : isFixed ? '<span class="rn-wait">● pending</span>'
+            : '<span class="rn-na">—</span>';
+          return "<tr><td class=\"title-cell\">" + esc(title) + "</td>" +
+            "<td>" + prBadge(pr) + "</td>" +
+            "<td>" + stBadge(st) + "</td>" +
+            '<td class="comp">' + esc(comp) + "</td>" +
+            "<td>" + rn + "</td></tr>";
+        }).join("");
+        return "<table><thead><tr><th>Bug</th><th>Priority</th><th>Status</th><th>Component</th><th>Release note</th></tr></thead><tbody>" +
+          body + "</tbody></table>";
+      }
+
+      function prBadge(p) {
+        var c = PRIORITY_COLOR[p] || "var(--muted)";
+        return '<span class="badge"><span class="d" style="background:' + c + '"></span>' + esc(p) + "</span>";
+      }
+      function stBadge(s) {
+        var c = STATUS_COLOR[s] || "var(--muted)";
+        return '<span class="badge"><span class="d" style="background:' + c + '"></span>' + esc(statusLabel(s)) + "</span>";
+      }
+    </script>
+  </body>
+</html>

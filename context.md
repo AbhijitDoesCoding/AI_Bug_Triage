@@ -59,10 +59,21 @@ lemma pods import .                  # apply
   human-readable mirrors; the JSON is authoritative)
 - **Auth:** `lemma auth login` (browser-based)
 
+### Apps
+- `bug-triage-board` — a no-build HTML dashboard (`apps/bug-triage-board/index.html`)
+  deployed live at **https://bug-triage-board.apps.lemma.work**. Reads the `bugs`
+  table via the browser Lemma SDK and shows KPI tiles, a status funnel, priority
+  donut, component bars, the release-note pipeline, and a recent-bugs table. Auto-
+  refreshes on row changes via `datastore.watchChanges` (no polling).
+  Redeploy: `lemma apps deploy bug-triage-board ./apps/bug-triage-board/index.html --yes`.
+
+### Surfaces (chat front doors)
+- `telegram` — Lemma-managed system bot on `triage_agent` (ACTIVE, zero-config).
+- `slack` — custom Slack app on `triage_agent` (ACTIVE; inbound event routing had a
+  backend hiccup during setup — the built-in Lemma chat is the reliable conversational
+  demo).
+
 ## Roadmap (not yet built)
-- **Ingress surface** — a Slack surface or a webhook-triggered workflow so real
-  messages flow straight into triage.
-- **Dashboard app** — a live view of open bugs by priority/component, the status
-  funnel, and the release-note approval queue.
 - **Seed data** — a set of realistic sample reports (including a duplicate) to make
   the demo run itself.
+- **Webhook ingress** — auto-triage from an inbound email/message pipeline.
