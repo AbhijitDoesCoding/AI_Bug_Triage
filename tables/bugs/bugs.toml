@@ -1,6 +1,9 @@
 # tables/bugs.toml
 # Lemma table schema for the bugs table (TOML reference).
 # The authoritative format is bugs.json — this file is a human-readable reference.
+#
+# System columns id, created_at, updated_at are added automatically by Lemma —
+# never declare them here.
 
 name = "bugs"
 primary_key_column = "id"
@@ -21,6 +24,14 @@ default = "Medium"
 options = ["Low", "Medium", "High"]
 
 [[columns]]
+name = "component"
+type = "ENUM"
+required = true
+default = "Other"
+options = ["Auth", "Billing", "UI", "API", "Data", "Performance", "Other"]
+description = "Which part of the product the bug affects."
+
+[[columns]]
 name = "raw_complaint"
 type = "TEXT"
 required = true
@@ -31,10 +42,42 @@ type = "TEXT"
 required = false
 
 [[columns]]
+name = "triage_reasoning"
+type = "TEXT"
+required = false
+description = "Why the agent assigned this priority/component — transparency for reviewers."
+
+[[columns]]
+name = "reporter"
+type = "TEXT"
+required = false
+max_length = 120
+description = "Who reported it (name/handle parsed from the message), if known."
+
+[[columns]]
+name = "duplicate_of"
+type = "UUID"
+required = false
+description = "If this is a duplicate, the id of the canonical bug it duplicates. Null otherwise."
+
+[[columns]]
 name = "status"
 type = "ENUM"
 required = true
 default = "Open"
 options = ["Open", "In_Progress", "Fixed"]
+
+[[columns]]
+name = "release_note"
+type = "TEXT"
+required = false
+description = "Approved user-facing release note, written by the release-notes workflow."
+
+[[columns]]
+name = "release_notes_approved"
+type = "BOOLEAN"
+required = false
+default = false
+description = "True once a human approved the release note. Also guards the workflow from re-firing."
 
 [config]

@@ -1,0 +1,11 @@
+{
+  "name": "save_release_note",
+  "description": "Persist the approved release note onto a bug row and mark it approved.",
+  "type": "API",
+  "visibility": "POD",
+  "code": { "$file": "code.py" },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "bugs",
+      "permission_ids": ["datastore.table.read", "datastore.record.read", "datastore.record.write"] }
+  ] }
+}

@@ -3,12 +3,15 @@
 # The authoritative format is release-notes.json — this file is a human-readable reference.
 
 name = "release-notes"
-description = "Drafts release notes when a bug is marked as Fixed, with human-in-the-loop approval."
+description = "When a bug is marked Fixed, drafts a user-facing release note, gets human approval, and saves the approved note back to the bug."
 visibility = "POD"
 
 # ── Trigger ──────────────────────────────────────────────────────────────────
-# Fires on every UPDATE to the bugs table. The DECISION node below filters
-# to only status == 'Fixed'.
+# Fires on every UPDATE to the bugs table. The check_fixed DECISION filters to
+# status == 'Fixed' AND release_notes_approved != true. That second clause is the
+# re-entry guard: when save_release_note sets release_notes_approved = true, the
+# resulting UPDATE fires this workflow again, but the guard routes it straight to
+# END instead of drafting a second note (no infinite loop).
 
 [start]
 type = "DATASTORE_EVENT"
@@ -19,30 +22,32 @@ operations = ["UPDATE"]
 
 # ── Nodes ────────────────────────────────────────────────────────────────────
 
-# 1. Guard: only proceed when status changes to Fixed
+# 1. Guard: only proceed for a freshly-Fixed bug that has no approved note yet.
 [[nodes]]
 id = "check_fixed"
 type = "DECISION"
-label = "Check Status == Fixed"
+label = "Fixed and not yet approved?"
 
 [[nodes.config.rules]]
-condition = "start.payload.status == 'Fixed'"
+condition = "start.payload.status == 'Fixed' && start.payload.release_notes_approved != `true`"
 next_node_id = "draft_note"
 
-# 2. Agent drafts the release note
+# 2. release_writer drafts the note. NOTE: the changed row's id is at
+#    start.metadata.record_id for DATASTORE_EVENT triggers — NOT start.payload.id.
 [[nodes]]
 id = "draft_note"
 type = "AGENT"
 label = "Draft Release Note"
 
 [nodes.config]
-agent_name = "triage_agent"
+agent_name = "release_writer"
 
 [nodes.config.input_mapping.bug_id]
 type = "expression"
-value = "start.payload.id"
+value = "start.metadata.record_id"
 
-# 3. Human approval — pauses the workflow, routes to the approval queue
+# 3. Human approval — pauses the run; the form pre-fills the drafted note so the
+#    reviewer can edit it in place before approving.
 [[nodes]]
 id = "approval"
 type = "FORM"
@@ -58,34 +63,68 @@ title = "Approve this release note?"
 
 [nodes.config.input_schema.properties.edited_note]
 type = "string"
-title = "Edited release note (leave blank to use draft)"
+title = "Release note (edit before approving if needed)"
+# default is a dynamic binding to the drafted note (resolved when the form suspends):
+# default = { type = "expression", value = "draft_note.release_note", optional = true }
 
-# Uncomment and set to a pod member UUID to route to a specific reviewer:
-# [nodes.config]
-# assignee_pod_member_id = "00000000-0000-0000-0000-000000000000"
+# 4. Route on the approval decision.
+[[nodes]]
+id = "approve_route"
+type = "DECISION"
+label = "Approved?"
 
-# 4. Terminal
+[[nodes.config.rules]]
+condition = "approval.approved == `true`"
+next_node_id = "save_note"
+
+# 5. Persist the approved note and set release_notes_approved = true.
+[[nodes]]
+id = "save_note"
+type = "FUNCTION"
+label = "Save Approved Note"
+
+[nodes.config]
+function_name = "save_release_note"
+
+[nodes.config.input_mapping.bug_id]
+type = "expression"
+value = "start.metadata.record_id"
+
+[nodes.config.input_mapping.note]
+type = "expression"
+value = "approval.edited_note"
+
+# 6. Terminal
 [[nodes]]
 id = "end"
 type = "END"
 label = "Done"
 
 # ── Edges ────────────────────────────────────────────────────────────────────
+# DECISION routing = rules (next_node_id jumps) + the FIRST-listed outgoing edge as
+# the default/else branch.
 
-# Default path: status != Fixed → skip to end
 [[edges]]
 id = "e1"
 source = "check_fixed"
-target = "end"
+target = "end"           # default: not fixed / already approved
 
-# Draft → approval form
 [[edges]]
 id = "e2"
 source = "draft_note"
 target = "approval"
 
-# Approval submitted → end
 [[edges]]
 id = "e3"
 source = "approval"
+target = "approve_route"
+
+[[edges]]
+id = "e4"
+source = "approve_route"
+target = "end"           # default: not approved
+
+[[edges]]
+id = "e5"
+source = "save_note"
 target = "end"

@@ -1,6 +1,6 @@
 {
   "name": "release-notes",
-  "description": "Drafts release notes when a bug is marked as Fixed, with human-in-the-loop approval.",
+  "description": "When a bug is marked Fixed, drafts a user-facing release note, gets human approval, and saves the approved note back to the bug.",
   "start": {
     "type": "DATASTORE_EVENT",
     "config": {
@@ -12,11 +12,11 @@
     {
       "id": "check_fixed",
       "type": "DECISION",
-      "label": "Check Status == Fixed",
+      "label": "Fixed and not yet approved?",
       "config": {
         "rules": [
           {
-            "condition": "start.payload.status == 'Fixed'",
+            "condition": "start.payload.status == 'Fixed' && start.payload.release_notes_approved != `true`",
             "next_node_id": "draft_note"
           }
         ]
@@ -27,9 +27,9 @@
       "type": "AGENT",
       "label": "Draft Release Note",
       "config": {
-        "agent_name": "triage_agent",
+        "agent_name": "release_writer",
         "input_mapping": {
-          "bug_id": { "type": "expression", "value": "start.payload.id" }
+          "bug_id": { "type": "expression", "value": "start.metadata.record_id" }
         }
       }
     },
@@ -42,9 +42,36 @@
           "type": "object",
           "properties": {
             "approved": { "type": "boolean", "title": "Approve this release note?" },
-            "edited_note": { "type": "string", "title": "Edited release note (leave blank to use draft)" }
+            "edited_note": {
+              "type": "string",
+              "title": "Release note (edit before approving if needed)",
+              "default": { "type": "expression", "value": "draft_note.release_note", "optional": true }
+            }
           },
           "required": ["approved"]
+        },
+        "ui_schema": { "ui:order": ["edited_note", "approved"] }
+      }
+    },
+    {
+      "id": "approve_route",
+      "type": "DECISION",
+      "label": "Approved?",
+      "config": {
+        "rules": [
+          { "condition": "approval.approved == `true`", "next_node_id": "save_note" }
+        ]
+      }
+    },
+    {
+      "id": "save_note",
+      "type": "FUNCTION",
+      "label": "Save Approved Note",
+      "config": {
+        "function_name": "save_release_note",
+        "input_mapping": {
+          "bug_id": { "type": "expression", "value": "start.metadata.record_id" },
+          "note": { "type": "expression", "value": "approval.edited_note" }
         }
       }
     },
@@ -55,9 +82,11 @@
     }
   ],
   "edges": [
-    { "id": "e1", "source": "check_fixed", "target": "end" },
+    { "id": "e1", "source": "check_fixed", "target": "end", "label": "not fixed / already approved (default)" },
     { "id": "e2", "source": "draft_note", "target": "approval" },
-    { "id": "e3", "source": "approval", "target": "end" }
+    { "id": "e3", "source": "approval", "target": "approve_route" },
+    { "id": "e4", "source": "approve_route", "target": "end", "label": "not approved (default)" },
+    { "id": "e5", "source": "save_note", "target": "end" }
   ],
   "visibility": "POD"
 }

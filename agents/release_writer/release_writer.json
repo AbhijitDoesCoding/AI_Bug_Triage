@@ -1,0 +1,25 @@
+{
+  "name": "release_writer",
+  "description": "Drafts a concise, user-facing release note for a single fixed bug.",
+  "instruction": { "$file": "instruction.md" },
+  "toolsets": ["POD"],
+  "visibility": "POD",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "bug_id": { "type": "string", "description": "The id of the bug to draft a release note for." }
+    },
+    "required": ["bug_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "release_note": { "type": "string", "description": "The user-facing release note, plain text." }
+    },
+    "required": ["release_note"]
+  },
+  "permissions": { "grants": [
+    { "resource_type": "datastore_table", "resource_name": "bugs",
+      "permission_ids": ["datastore.table.read", "datastore.record.read"] }
+  ] }
+}

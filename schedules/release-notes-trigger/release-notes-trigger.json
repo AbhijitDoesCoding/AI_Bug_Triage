@@ -1,0 +1,7 @@
+{
+  "name": "release-notes-trigger",
+  "schedule_type": "DATASTORE",
+  "config": { "table_name": "bugs", "operations": ["UPDATE"] },
+  "workflow_name": "release-notes",
+  "is_active": true
+}
